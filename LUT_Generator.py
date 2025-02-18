@@ -47,12 +47,14 @@ def custom_strategy(solution):
 
     feedbacks2 = [None] * 4
     feedback_offset = _feedback_counter
-    half_LUT[tuple(feedbacks2)] = stage2(solution[:4], left)
+    half1 = stage2(solution[:4], left)
+    half_LUT[tuple(feedbacks2)] = half1
 
     feedbacks2 = [None] * 4
     feedback_offset = _feedback_counter
-    half_LUT[tuple(feedbacks2)] = stage2(solution[4:], right, final=True)
-    return
+    half2 = stage2(solution[4:], right, final=True)
+    half_LUT[tuple(feedbacks2)] = half2
+    return half1 + half2
 
 def stage1(solution):
     left = []
@@ -394,6 +396,31 @@ def guess_2(solution, guess, parts, last_feedback=False):
     return feedback
 
 
+def gen_lut(clean_up=True):
+    global _feedback_counter, feedbacks, guess_LUT
+
+    _feedback_counter = 0
+    feedbacks = [None] * 5
+    guess_LUT = {}
+
+    for sol in generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8)):
+        custom_strategy(sol)
+    _feedback_counter = 0
+
+    if not clean_up:
+        return
+    new_dict = {}  # copy to new dict
+    # because lut does not shift values across like what we are expecting
+    for key, val in guess_LUT.items():
+        new_key = [k for k in reversed(key) if k is not None] # remove None
+        while len(new_key) < 5:
+            new_key.append(3)   # fill with 3 instead of None
+
+        new_dict[tuple(new_key)] = (val[0], val[4])
+
+    return new_dict
+
+
 ########## Decision tree from LUT #########
 
 class TreeNode:
@@ -412,7 +439,6 @@ class TreeNode:
         return "" if self.feedback is None else str(self.feedback)
 
 
-
 def build_decision_tree():
     root = TreeNode(guess_LUT[tuple(None for _ in range(5))], None)
     for key, val in guess_LUT.items():
@@ -429,13 +455,32 @@ def build_decision_tree():
 
 ########## Games using LUT #########
 
+def guess_w_LUT1(solution):
+    if tuple(feedbacks) in guess_LUT:
+        guess = guess_LUT[tuple(feedbacks)]
+        feedback = get_feedback(solution, guess)
+        feedbacks[_feedback_counter - 1] = feedback
+        return feedback
+    return None
+
+def guess_w_LUT2(solution, parts, first_half=False):
+    if tuple(feedbacks2) in guess_LUT2:
+        guess, final = guess_LUT2[tuple(feedbacks2)]
+        actual_guess = tuple(parts[i] for i in guess)
+        if final and first_half:
+            return None
+        feedback = get_feedback(solution, actual_guess)
+        feedbacks2[_feedback_counter - feedback_offset - 1] = feedback
+        return feedback
+    return None
+
 def verify_all_solutions():
     global _feedback_counter
     seqs = generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8))
     tries = 0
     for sol in seqs:
         _feedback_counter = 0
-        g = custom_strategy(sol)    # TODO
+        g = custom_strategy(sol)
         if g != sol:
             print(f"Solution: {sol}, Guess: {g}")
         tries += _feedback_counter
