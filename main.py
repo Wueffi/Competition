@@ -1,15 +1,18 @@
-from LUT_Generator import gen_lut
-from DecoderGenerator import *
+from LUT_Generator import LUT_Generator
+from SchematicGenerator import *
 
 
 FOLDER = "schems/"
 
 def main():
 
-    first_LUT = gen_lut()
+    lut_gen = LUT_Generator()
+    stage1_LUT, left_right_LUT, stage2_LUT = lut_gen.generate_LUT()
 
-    create_lut_schematic(first_LUT, FOLDER + "LUT.schem")
-    create_decoder_schematic(first_LUT.keys(), FOLDER + "Decoder.schem")
+    lut_gen.print_LUTs()
+
+    create_lut_schematic(stage1_LUT, FOLDER + "LUT.schem")
+    create_decoder_schematic(stage1_LUT.keys(), FOLDER + "Decoder.schem")
 
 
     return

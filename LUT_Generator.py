@@ -13,56 +13,142 @@ def generate_possible_sequences(options, length=-1):
     return set(itertools.permutations(options, len(options) if length == -1 else length))
 
 
-_feedback_counter = 0
-def get_feedback(guess, solution):
-    global _feedback_counter
-    _feedback_counter += 1
-    return sum(1 for g, s in zip(guess, solution) if g == s)
-
-
 ############# Custom strategy ###############
 
-# globals
-INVALID = 3
-feedbacks = [None] * 5
+class LUT_Generator:
+    def __init__(self):
+        self.guess_LUT = {}
+        self.left_right_LUT = {}
+        self.guess_LUT2 = {}
+        self.solution = None
+        self.feedbacks = []
+        self.feedbacks2 = []
 
-guess_LUT = {}
-left_right_LUT = {}
+        self.luts: tuple[
+                       dict[tuple[int, ...], tuple[int, int]],
+                       dict[tuple[int, ...], tuple[int, ...]],
+                       dict[tuple[int, ...], tuple[int, ...]]
+                   ] | None = None
+        return
 
-INVALID2 = 5
-feedbacks2 = [None] * 4
-guess_LUT2 = {}
-half_LUT = {}
-feedback_offset = 0
+    def guess(self, guess):
+        feedbacks = tuple(self.feedbacks)
+        if feedbacks not in self.guess_LUT:
+            self.guess_LUT[feedbacks] = guess
+        feedback = sum(1 for g, s in zip(guess, self.solution) if g == s)
+        self.feedbacks.insert(0, feedback)
+        return feedback
+
+    def guess_half(self, guess, mappings, first_half: bool, certain=False):
+        """first_half: True if it's the first half of the stage 2 guess and False if it's the second half
+        certain: True if the guess is certain to be correct and False if it's not certain.
+        "certain" guesses must be guessed anyway in the second half of the stage 2
+        """
+        feedbacks = tuple(self.feedbacks2)
+
+        if feedbacks not in self.guess_LUT2:
+            self.guess_LUT2[feedbacks] = guess, certain
+
+        check_against = self.solution[:4] if first_half else self.solution[4:]
+        feedback = sum(1 for g, s in zip([mappings[i] for i in guess], check_against) if g == s)
+        self.feedbacks2.insert(0, feedback)
+        return feedback
+
+    def finish_stage1(self, left, right):
+        self.stage1_len = len(self.feedbacks)
+        self.left_right_LUT[tuple(self.feedbacks)] = tuple(left + right)
+        return
+
+    def finish_stage2(self, half):
+        if tuple(self.feedbacks2) not in self.guess_LUT2 and self.feedbacks2[0] != 4:   # no point in guessing after a 4
+            self.guess_LUT2[tuple(self.feedbacks2)] = half, True
+        self.feedbacks2 = []
+        return
+
+    def generate_LUT(self) -> tuple[dict[tuple[int, ...], tuple[int, int]], dict[tuple[int, ...], tuple[int, ...]], dict[tuple[int, ...], tuple[int, ...]]]:
+        """Returns:
+        1. LUT for guesses of stage 1
+        2. LUT for left-right mapping
+        3. LUT for guesses of stage 2
+        """
+        if self.luts is not None:
+            return self.luts
+
+        self.reset_LUT()
+
+        # run every game
+        for sol in generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8)):
+            self.new_game(sol)
+            custom_strategy(self)
+
+        new_dict = {}
+        for key, val in self.guess_LUT.items():
+            new_key = list(key)
+            while len(new_key) < 5:
+                new_key.append(3)
+
+            new_dict[tuple(new_key)] = (val[0], val[4])
+
+        new_dict2 = {}
+        for key, val in self.left_right_LUT.items():
+            new_key = list(key)
+            while len(new_key) < 5:
+                new_key.append(3)
+
+            new_dict2[tuple(new_key)] = val
+
+        new_dict3 = {}
+        for key, val in self.guess_LUT2.items():
+            new_key = list(key)
+            while len(new_key) < 4:
+                new_key.append(5)
+
+            new_dict3[tuple(new_key)] = val[0] + (1,) if val[1] else (0,)
+
+        return new_dict, new_dict2, new_dict3
+
+    def print_LUTs(self):
+        self.generate_LUT() # making sure they are generated
+
+        print("Stage1 LUT:")
+        d = self.guess_LUT | self.left_right_LUT
+        print_tree(build_decision_tree(d, 3))
+        print("\nStage2 LUT:")
+        print_tree(build_decision_tree(self.guess_LUT2, 5))
+        return
+
+    def reset_LUT(self):
+        self.guess_LUT = {}
+        self.left_right_LUT = {}
+        self.guess_LUT2 = {}
+        self.luts = None
+        return
+
+    def new_game(self, solution):
+        self.solution = solution
+        self.feedbacks = []
+        self.feedbacks2 = []
+        return
 
 
-def custom_strategy(solution):
-    global _feedback_counter, feedback_offset, feedbacks, feedbacks2
-    _feedback_counter = 0
-    feedback_offset = _feedback_counter
-    feedbacks = [None] * 5
+def custom_strategy(lut_gen: LUT_Generator):
+    left, right = stage1(lut_gen)
+    lut_gen.finish_stage1(left, right)
 
-    left, right = stage1(solution)
-    left_right_LUT[tuple(feedbacks)] = tuple(left + right)
+    half1 = stage2(lut_gen, left)
+    lut_gen.finish_stage2(half1)
 
-    feedbacks2 = [None] * 4
-    feedback_offset = _feedback_counter
-    half1 = stage2(solution[:4], left)
-    half_LUT[tuple(feedbacks2)] = half1
-
-    feedbacks2 = [None] * 4
-    feedback_offset = _feedback_counter
-    half2 = stage2(solution[4:], right, final=True)
-    half_LUT[tuple(feedbacks2)] = half2
+    half2 = stage2(lut_gen, right, final=True)
+    #lut_gen.finish_stage2(half2)
     return half1 + half2
 
-def stage1(solution):
+def stage1(lut_gen: LUT_Generator):
     left = []
     right = []
-    first3guesses(solution, left, right)
+    first3guesses(lut_gen, left, right)
     if len(left) == 0:  # all feedbacks are 1 -> 12 34 56 78
         guess = (1, 1, 1, 1, 3, 3, 3, 3)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
 
         if feedback == 0:
             left += [3, 4]
@@ -72,7 +158,7 @@ def stage1(solution):
             right += [3, 4]
         else:
             guess = (1, 1, 1, 1, 5, 5, 5, 5)
-            feedback = guess_(solution, guess)
+            feedback = lut_gen.guess(guess)
             if feedback == 0:
                 left += [5, 6, 7, 8]
                 right += [1, 2, 3, 4]
@@ -85,7 +171,7 @@ def stage1(solution):
                 assert False
 
         guess = (5, 5, 5, 5, 7, 7, 7, 7)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [7, 8]
             right += [5, 6]
@@ -99,7 +185,7 @@ def stage1(solution):
 
     elif len(left) == 1 and left[0] in (5, 6):  # 12? 34? 5|6 7|8?
         guess = (1, 1, 1, 1, 3, 3, 3, 3)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [3, 4]
             right += [1, 2]
@@ -110,7 +196,7 @@ def stage1(solution):
             assert False
 
         guess = (7, 7, 7, 7, 8, 8, 8, 8)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [8]
             right += [7]
@@ -124,7 +210,7 @@ def stage1(solution):
 
     elif len(left) == 1 and left[0] in (3, 4):  # 12|56? 3|4 7|8?
         guess = (7, 7, 7, 7, 8, 8, 8, 8)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [8]
             right += [7]
@@ -135,7 +221,7 @@ def stage1(solution):
             assert False
 
         guess = (1, 1, 1, 1, 5, 5, 5, 5)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [5, 6]
             right += [1, 2]
@@ -149,7 +235,7 @@ def stage1(solution):
 
     elif len(left) == 2 and left[0] in (3, 4) and left[1] in (5, 6):
         guess = (1, 1, 1, 1, 7, 7, 7, 7)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [7, 8]
             right += [1, 2]
@@ -163,7 +249,7 @@ def stage1(solution):
 
     elif len(left) == 1 and left[0] in (1, 2):  # 1|2 34 56 7|8?
         guess = (7, 7, 7, 7, 8, 8, 8, 8)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [8]
             right += [7]
@@ -174,7 +260,7 @@ def stage1(solution):
             assert False
 
         guess = (3, 3, 3, 3, 5, 5, 5, 5)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [5, 6]
             right += [3, 4]
@@ -188,7 +274,7 @@ def stage1(solution):
 
     elif len(left) == 2 and left[0] in (1, 2) and left[1] in (5, 6):
         guess = (3, 3, 3, 3, 7, 7, 7, 7)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [7, 8]
             right += [3, 4]
@@ -202,7 +288,7 @@ def stage1(solution):
 
     elif len(left) == 2 and left[0] in (1, 2) and left[1] in (3, 4):
         guess = (5, 5, 5, 5, 7, 7, 7, 7)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [7, 8]
             right += [5, 6]
@@ -216,7 +302,7 @@ def stage1(solution):
 
     elif len(left) == 3:
         guess = (7, 7, 7, 7, 8, 8, 8, 8)
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
         if feedback == 0:
             left += [8]
             right += [7]
@@ -230,10 +316,10 @@ def stage1(solution):
     else:
         assert False
 
-def first3guesses(solution, left, right):
+def first3guesses(lut_gen, left, right):
     for i in range(0, 3, 1):
         guess = tuple(1 +2*i + j // 4 for j in range(0, 8))
-        feedback = guess_(solution, guess)
+        feedback = lut_gen.guess(guess)
 
         if feedback == 0:
             left.append(guess[4])
@@ -242,90 +328,83 @@ def first3guesses(solution, left, right):
             left.append(guess[0])
             right.append(guess[4])
 
-def guess_(solution, guess):
-    if tuple(feedbacks) not in guess_LUT:
-        guess_LUT[tuple(feedbacks)] = guess
-    feedback = get_feedback(guess, solution)
-    feedbacks[_feedback_counter-1] = feedback
-    return feedback
-
-def stage2(solution, parts, final=False):
+def stage2(lut_gen: LUT_Generator, parts, final=False):
     a, b, c, d = (0, 1, 2, 3)
 
     guess = (a, a, b, b)
-    feedback = guess_2(solution, guess, parts)
+    feedback = lut_gen.guess_half(guess, parts, not final)
     if feedback == 0:
         guess = (d, b, a, d)
-        feedback = guess_2(solution, guess, parts)
+        feedback = lut_gen.guess_half(guess, parts, not final)
         if feedback == 0:
             guess = (b, c, d, a)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (b, d, c, a)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 1:
             guess = (c, b, d, a)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (b, d, a, c)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 2:
             guess = (d, b, c, a)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (b, c, a, d)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 3:
             guess = (d, b, a, c)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (c, b, a, d)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         else:
             assert False
     elif feedback == 1:
         guess = (b, a, a, c)
-        feedback = guess_2(solution, guess, parts)
+        feedback = lut_gen.guess_half(guess, parts, not final)
         if feedback == 0:
             guess = (c, d, b, a)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback == 0:
                 guess = (a, b, c, d)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             elif feedback == 2:
                 guess = (d, c, b, a)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             else:
                 assert feedback == 4
             return guess
         elif feedback == 1:
             guess = (c, d, a, b)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback == 0:
                 guess = (a, b, d, c)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             elif feedback == 2:
                 guess = (d, c, a, b)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             else:
                 assert feedback == 4
@@ -333,92 +412,60 @@ def stage2(solution, parts, final=False):
         elif feedback == 2:
             guess = (b, a, c, d)
             if final:
-                feedback = guess_2(solution, guess, parts)
+                feedback = lut_gen.guess_half(guess, parts, not final)
                 assert feedback == 4
             return guess
         elif feedback == 3:
             guess = (b, a, d, c)
             if final:
-                feedback = guess_2(solution, guess, parts)
+                feedback = lut_gen.guess_half(guess, parts, not final)
                 assert feedback == 4
             return guess
         else:
             assert False
     elif feedback == 2:
         guess = (a, d, d, b)
-        feedback = guess_2(solution, guess, parts)
+        feedback = lut_gen.guess_half(guess, parts, not final)
         if feedback == 0:
             guess = (d, a, b, c)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (c, a, b, d)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 1:
             guess = (d, a, c, b)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (a, c, b, d)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 2:
             guess = (a, d, b, c)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (c, a, d, b)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         elif feedback == 3:
             guess = (a, c, d, b)
-            feedback = guess_2(solution, guess, parts)
+            feedback = lut_gen.guess_half(guess, parts, not final)
             if feedback != 4:
                 guess = (a, d, c, b)
                 if final:
-                    feedback = guess_2(solution, guess, parts)
+                    feedback = lut_gen.guess_half(guess, parts, not final, True)
                     assert feedback == 4
             return guess
         else:
             assert False
     else:
         assert False
-
-def guess_2(solution, guess, parts, last_feedback=False):
-    if tuple(feedbacks2) not in guess_LUT2:
-        guess_LUT2[tuple(feedbacks2)] = guess, last_feedback
-    feedback = get_feedback(tuple(parts[i] for i in guess), solution)
-    feedbacks2[_feedback_counter-feedback_offset-1] = feedback #+ (4 if last_feedback and feedback < 4 else 0)
-    return feedback
-
-
-def gen_lut(clean_up=True):
-    global _feedback_counter, feedbacks, guess_LUT
-
-    _feedback_counter = 0
-    feedbacks = [None] * 5
-    guess_LUT = {}
-
-    for sol in generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8)):
-        custom_strategy(sol)
-    _feedback_counter = 0
-
-    if not clean_up:
-        return
-    new_dict = {}  # copy to new dict
-    # because lut does not shift values across like what we are expecting
-    for key, val in guess_LUT.items():
-        new_key = [k for k in reversed(key) if k is not None] # remove None
-        while len(new_key) < 5:
-            new_key.append(3)   # fill with 3 instead of None
-
-        new_dict[tuple(new_key)] = (val[0], val[4])
-
-    return new_dict
 
 
 ########## Decision tree from LUT #########
@@ -439,13 +486,13 @@ class TreeNode:
         return "" if self.feedback is None else str(self.feedback)
 
 
-def build_decision_tree():
-    root = TreeNode(guess_LUT[tuple(None for _ in range(5))], None)
+def build_decision_tree(guess_LUT, empty_element):
+    root = TreeNode(guess_LUT[tuple(empty_element for _ in next(iter(guess_LUT.keys())))], None)
     for key, val in guess_LUT.items():
         node = root
-        for i, feedback in enumerate(key):
-            if feedback is None:
-                break
+        for feedback in reversed(key):
+            if feedback is empty_element:
+                continue
             if feedback not in node.children:
                 node.children[feedback] = TreeNode(val, feedback)
             node = node.children[feedback]
@@ -454,7 +501,7 @@ def build_decision_tree():
 
 
 ########## Games using LUT #########
-
+"""
 def guess_w_LUT1(solution):
     if tuple(feedbacks) in guess_LUT:
         guess = guess_LUT[tuple(feedbacks)]
@@ -475,14 +522,13 @@ def guess_w_LUT2(solution, parts, first_half=False):
     return None
 
 def verify_all_solutions():
-    global _feedback_counter
     seqs = generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8))
     tries = 0
     for sol in seqs:
-        _feedback_counter = 0
-        g = custom_strategy(sol)
+        g = custom_strategy(None)
         if g != sol:
             print(f"Solution: {sol}, Guess: {g}")
         tries += _feedback_counter
     print(f"Average number of tries: {tries / len(seqs)}")
     return
+"""
