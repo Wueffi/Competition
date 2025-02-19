@@ -77,7 +77,7 @@ class LUT_Generator:
         self.reset_LUT()
 
         # run every game
-        for sol in generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8)):
+        for sol in generate_possible_sequences(tuple(i for i in range(1, 8+1))):
             self.new_game(sol)
             custom_strategy(self)
 
@@ -103,7 +103,7 @@ class LUT_Generator:
             while len(new_key) < 4:
                 new_key.append(5)
 
-            new_dict3[tuple(new_key)] = val[0] + (1,) if val[1] else (0,)
+            new_dict3[tuple(new_key)] = val[0] + (int(val[1]),)
 
         return new_dict, new_dict2, new_dict3
 
@@ -494,6 +494,7 @@ def build_decision_tree(guess_LUT, empty_element):
             if feedback is empty_element:
                 continue
             if feedback not in node.children:
+                #node.children[feedback] = TreeNode(val if len(val) != 2 else val[0]+(f"|{val[1]}",), feedback)
                 node.children[feedback] = TreeNode(val, feedback)
             node = node.children[feedback]
 
@@ -522,7 +523,7 @@ def guess_w_LUT2(solution, parts, first_half=False):
     return None
 
 def verify_all_solutions():
-    seqs = generate_possible_sequences((1, 2, 3, 4, 5, 6, 7, 8))
+    seqs = generate_possible_sequences(tuple(i for i in range(1, 8+1)))
     tries = 0
     for sol in seqs:
         g = custom_strategy(None)
