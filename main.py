@@ -11,6 +11,8 @@ def main():
 
     lut_gen.print_LUTs()
 
+    lut_gen.verify_all_solutions()
+
     create_lut_schematic(stage1_LUT, FOLDER + "LUT1.schem")
     create_decoder_schematic(stage1_LUT.keys(), FOLDER + "Decoder1.schem")
 

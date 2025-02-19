@@ -23,6 +23,7 @@ class LUT_Generator:
         self.solution = None
         self.feedbacks = []
         self.feedbacks2 = []
+        self._guess_counter = 0
 
         self.luts: tuple[
                        dict[tuple[int, ...], tuple[int, int]],
@@ -30,6 +31,55 @@ class LUT_Generator:
                        dict[tuple[int, ...], tuple[int, ...]]
                    ] | None = None
         return
+
+    def verify_all_solutions(self):
+        seqs = generate_possible_sequences(tuple(i for i in range(1, 8 + 1)))
+        guesses = 0
+        for sol in seqs:
+            self.new_game(sol)
+            if sol == (4, 8, 3, 5, 2, 6, 1, 7):
+                pass
+            final_guess, g = self.play_with_LUTs()
+            if final_guess != sol:
+                print(f"Solution: {sol}, Guess: {final_guess}")
+            guesses += g
+        print(f"Average number of tries: {guesses / len(seqs)}")
+        return
+
+    def play_with_LUTs(self) -> tuple[tuple[int, ...], int]:
+        self._guess_counter = 0
+        while tuple(self.feedbacks) in self.guess_LUT:
+            g = self.guess_LUT[tuple(self.feedbacks)]
+            self._guess(g, 1)
+
+        left = self.left_right_LUT[tuple(self.feedbacks)][:4]
+        right = self.left_right_LUT[tuple(self.feedbacks)][4:]
+
+        while tuple(self.feedbacks2) in self.guess_LUT2:   # doing left side
+            guess, certain = self.guess_LUT2[tuple(self.feedbacks2)]
+            g = tuple([left[i] for i in guess] + [left[0] for _ in guess])
+            if certain or self._guess(g, 2) == 4:
+                break
+
+        left_side = g[:4]
+        self.feedbacks2 = []
+
+        while tuple(self.feedbacks2) in self.guess_LUT2:   # doing right side
+            guess, certain = self.guess_LUT2[tuple(self.feedbacks2)]
+            g = left_side + tuple([right[i] for i in guess])
+            if self._guess(g, 2) == 8:
+                break
+
+        return g, self._guess_counter
+
+    def _guess(self, guess, stage):
+        feedback = sum(1 for g, s in zip(guess, self.solution) if g == s)
+        if stage == 1:
+            self.feedbacks.insert(0, feedback)
+        else:
+            self.feedbacks2.insert(0, feedback%4)   # avoids the side being filled interfering
+        self._guess_counter += 1
+        return feedback
 
     def guess(self, guess):
         feedbacks = tuple(self.feedbacks)
@@ -500,36 +550,3 @@ def build_decision_tree(guess_LUT, empty_element):
 
     return root
 
-
-########## Games using LUT #########
-"""
-def guess_w_LUT1(solution):
-    if tuple(feedbacks) in guess_LUT:
-        guess = guess_LUT[tuple(feedbacks)]
-        feedback = get_feedback(solution, guess)
-        feedbacks[_feedback_counter - 1] = feedback
-        return feedback
-    return None
-
-def guess_w_LUT2(solution, parts, first_half=False):
-    if tuple(feedbacks2) in guess_LUT2:
-        guess, final = guess_LUT2[tuple(feedbacks2)]
-        actual_guess = tuple(parts[i] for i in guess)
-        if final and first_half:
-            return None
-        feedback = get_feedback(solution, actual_guess)
-        feedbacks2[_feedback_counter - feedback_offset - 1] = feedback
-        return feedback
-    return None
-
-def verify_all_solutions():
-    seqs = generate_possible_sequences(tuple(i for i in range(1, 8+1)))
-    tries = 0
-    for sol in seqs:
-        g = custom_strategy(None)
-        if g != sol:
-            print(f"Solution: {sol}, Guess: {g}")
-        tries += _feedback_counter
-    print(f"Average number of tries: {tries / len(seqs)}")
-    return
-"""
