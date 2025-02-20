@@ -1,9 +1,6 @@
 from LUT_Generator import LUT_Generator
 from SchematicGenerator import *
 
-
-FOLDER = "schems/"
-
 def main():
 
     lut_gen = LUT_Generator()
@@ -11,16 +8,16 @@ def main():
 
     lut_gen.print_LUTs()
 
-    lut_gen.verify_all_solutions()
+    print(stage1_LUT.values())
+    print(left_right_LUT.values())
+    print(stage2_LUT.values())
 
-    create_lut_schematic(stage1_LUT, FOLDER + "LUT1.schem")
-    create_decoder_schematic(stage1_LUT.keys(), FOLDER + "Decoder1.schem")
-
-    create_lut_schematic(left_right_LUT, FOLDER + "LUT2.schem")
-    create_decoder_schematic(left_right_LUT.keys(), FOLDER + "Decoder2.schem")
-
-    create_lut_schematic(stage2_LUT, FOLDER + "LUT3.schem")
-    create_decoder_schematic(stage2_LUT.keys(), FOLDER + "Decoder3.schem")
+    create_lut_schematic(stage1_LUT.values(), "LUT1")
+    create_decoder_schematic(stage1_LUT.keys(), "Decoder1")
+    create_lut_schematic(left_right_LUT.values(), "LUT2")
+    create_decoder_schematic(left_right_LUT.keys(), "Decoder2")
+    create_lut_schematic(stage2_LUT.values(), "LUT3")
+    create_3b_decoder_schematic(stage2_LUT.keys(), "Decoder3")
 
     return
 
