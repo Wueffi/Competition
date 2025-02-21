@@ -37,8 +37,6 @@ class LUT_Generator:
         guesses = 0
         for sol in seqs:
             self.new_game(sol)
-            if sol == (4, 8, 3, 5, 2, 6, 1, 7):
-                pass
             final_guess, g = self.play_with_LUTs()
             if final_guess != sol:
                 print(f"Solution: {sol}, Guess: {final_guess}")
@@ -151,7 +149,7 @@ class LUT_Generator:
         for key, val in self.guess_LUT2.items():
             new_key = list(key)
             while len(new_key) < 4:
-                new_key.append(5)
+                new_key.append(7)
 
             new_dict3[tuple(new_key)] = val[0] + (int(val[1]),)
 
@@ -165,6 +163,7 @@ class LUT_Generator:
         print_tree(build_decision_tree(d, 3))
         print("\nStage2 LUT:")
         print_tree(build_decision_tree(self.guess_LUT2, 5))
+        print()
         return
 
     def reset_LUT(self):

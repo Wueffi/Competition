@@ -9,7 +9,9 @@ def main():
     lut_gen.print_LUTs()
 
     print(stage1_LUT.values())
+    print()
     print(left_right_LUT.values())
+    print()
     print(stage2_LUT.values())
 
     create_lut_schematic(stage1_LUT.values(), "LUT1")
