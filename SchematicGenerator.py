@@ -115,15 +115,15 @@ def create_3b_decoder_schematic(input_patterns, filename):
                 schem.setBlock((x, y + spacing, z),"minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
                 schem.setBlock((x, y, z),"minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
                 schem.setBlock((x, y + 2 * spacing, z),"minecraft:redstone_wall_torch[facing=north]")  # ON
-            elif num == 5:
+            elif num == 7:
                 schem.setBlock((x, y, z), "minecraft:redstone_wall_torch[facing=north]")  # ON
-                schem.setBlock((x, y + spacing, z),"minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
+                schem.setBlock((x, y + spacing, z),"minecraft:redstone_wall_torch[facing=north]")  # OFF
                 schem.setBlock((x, y + 2 * spacing, z), "minecraft:redstone_wall_torch[facing=north]")  # ON
             elif num == 0:
                 schem.setBlock((x, y, z), "minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
                 schem.setBlock((x, y + spacing, z),"minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
                 schem.setBlock((x, y + 2 * spacing, z),"minecraft:repeater[facing=south,delay=1,locked=false,powered=false]")  # OFF
-                
+
             schem.setBlock((x, y + 3, z), "minecraft:smooth_quartz_slab[type=top]")
             schem.setBlock((x, y + 1, z), "minecraft:smooth_quartz_slab[type=top]")
             schem.setBlock((x, y - 1, z), "minecraft:smooth_quartz_slab[type=top]")
