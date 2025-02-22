@@ -18,7 +18,7 @@ def main():
     create_decoder_schematic(stage1_LUT.keys(), "Decoder1")
     create_lut_schematic(left_right_LUT.values(), "LUT2")
     create_decoder_schematic(left_right_LUT.keys(), "Decoder2")
-    create_lut_schematic(stage2_LUT.values(), "LUT3")
+    create_3rd_lut_schematic(stage2_LUT.values(), "LUT3")
     create_3b_decoder_schematic(stage2_LUT.keys(), "Decoder3")
 
     return
