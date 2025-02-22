@@ -68,6 +68,28 @@ def create_lut_schematic(input_patterns, filename):
     schem.save("./schems", filename, mcschematic.Version.JE_1_20_1)
     print(f"Schematic saved as {filename}")
 
+def create_3rd_lut_schematic(input_patterns, filename):
+    schem = mcschematic.MCSchematic()
+    spacing = 4
+    z = 0  # Starting Z
+
+    for input_pattern in input_patterns:
+        y = 0  # Starting Y
+        x = 0  # Starting X
+        for num in input_pattern:
+            if num == 1:
+                schem.setBlock((x, y, z), "minecraft:redstone_wall_torch[facing=north]")  # ON
+            elif num == 2:
+                schem.setBlock((x, y + spacing, z), "minecraft:redstone_wall_torch[facing=north]")
+            elif num == 3:
+                schem.setBlock((x, y, z), "minecraft:redstone_wall_torch[facing=north]")
+                schem.setBlock((x, y + spacing, z), "minecraft:redstone_wall_torch[facing=north]")
+            x += 2
+        z += 2
+
+    schem.save("./schems", filename, mcschematic.Version.JE_1_20_1)
+    print(f"Schematic saved as {filename}")
+
 def create_3b_decoder_schematic(input_patterns, filename):
     schem = mcschematic.MCSchematic()
     spacing = 2
